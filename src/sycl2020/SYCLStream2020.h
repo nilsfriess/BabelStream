@@ -9,14 +9,15 @@
 
 #include <sstream>
 #include <memory>
+#include <vector>
 
 #include "Stream.h"
 
 #include <sycl/sycl.hpp>
 
-#ifdef SYCL2020ACC
+#if defined(ACCESSOR)
 #define SYCLIMPL "Accessors"
-#elif SYCL2020USM
+#elif defined(USM)
 #define SYCLIMPL "USM"
 #else
 #error unimplemented
@@ -36,8 +37,9 @@ class SYCLStream : public Stream<T>
     std::unique_ptr<sycl::queue> queue;
 
     // Buffers
-    T *a, *b, *c, *sum{};
+    T *a{}, *b{}, *c{}, *sum{};
     sycl::buffer<T> d_a, d_b, d_c, d_sum;
+    std::vector<T> host_a, host_b, host_c;
 
   public:
 
