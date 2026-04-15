@@ -177,17 +177,28 @@ register_model(futhark FUTHARK FutharkStream.cpp)
 
 set(USAGE ON CACHE BOOL "Whether to print all custom flags for the selected model")
 
-message(STATUS "Available models:  ${REGISTERED_MODELS}")
+set(DISPLAY_MODELS ${REGISTERED_MODELS} "sycl2020-acc" "sycl2020-usm")
+message(STATUS "Available models:  ${DISPLAY_MODELS}")
 if (NOT DEFINED MODEL)
     message(FATAL_ERROR "MODEL is unspecified, pick one from the available models")
 else ()
     message(STATUS "Selected model  :  ${MODEL}")
 endif ()
 
-if (MODEL STREQUAL "sycl2020")
-    message(FATAL_ERROR "
-    Model sycl2020 has been renamed to sycl2020-acc, and a new sycl2020-usm model is now available.
-    Please use sycl2020-acc for SYCL2020 style accessors and sycl2020-usm for USM")
+# Compatibility aliases for SYCL 2020 memory access mode naming.
+# Internally both modes are implemented by src/sycl2020 with SYCL_ACCESS selecting the behavior.
+if (MODEL STREQUAL "sycl2020-acc")
+    if (NOT DEFINED SYCL_ACCESS)
+        set(SYCL_ACCESS ACCESSOR)
+    endif ()
+    set(MODEL sycl2020)
+    message(STATUS "Resolved MODEL alias `sycl2020-acc` to `sycl2020` (SYCL_ACCESS=${SYCL_ACCESS})")
+elseif (MODEL STREQUAL "sycl2020-usm")
+    if (NOT DEFINED SYCL_ACCESS)
+        set(SYCL_ACCESS USM)
+    endif ()
+    set(MODEL sycl2020)
+    message(STATUS "Resolved MODEL alias `sycl2020-usm` to `sycl2020` (SYCL_ACCESS=${SYCL_ACCESS})")
 endif ()
 
 # load the $MODEL.cmake file and setup the correct IMPL_* based on $MODEL
