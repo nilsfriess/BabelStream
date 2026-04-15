@@ -67,10 +67,10 @@ SYCLStream<T>::SYCLStream(BenchId bs, const intptr_t array_size, const int devic
 
   // Allocate memory
 #if defined(ACCESSOR)
-  d_a = sycl::buffer<T>{array_size};
-  d_b = sycl::buffer<T>{array_size};
-  d_c = sycl::buffer<T>{array_size};
-  d_sum = sycl::buffer<T>{1};
+  d_a = std::make_unique<sycl::buffer<T>>(sycl::range<1>{array_size});
+  d_b = std::make_unique<sycl::buffer<T>>(sycl::range<1>{array_size});
+  d_c = std::make_unique<sycl::buffer<T>>(sycl::range<1>{array_size});
+  d_sum = std::make_unique<sycl::buffer<T>>(sycl::range<1>{1});
 
 #elif defined(USM)
 #if defined(PAGEFAULT)
@@ -125,8 +125,8 @@ void SYCLStream<T>::copy()
   queue->submit([&](sycl::handler &cgh)
   {
 #if defined(ACCESSOR)
-    sycl::accessor a {d_a, cgh, sycl::read_only};
-    sycl::accessor c {d_c, cgh, sycl::write_only};
+  sycl::accessor a {*d_a, cgh, sycl::read_only};
+  sycl::accessor c {*d_c, cgh, sycl::write_only};
 #else
     T *a_ptr = a;
     T *c_ptr = c;
@@ -155,8 +155,8 @@ void SYCLStream<T>::mul()
   queue->submit([&](sycl::handler &cgh)
   {
 #if defined(ACCESSOR)
-    sycl::accessor b {d_b, cgh, sycl::write_only};
-    sycl::accessor c {d_c, cgh, sycl::read_only};
+  sycl::accessor b {*d_b, cgh, sycl::write_only};
+  sycl::accessor c {*d_c, cgh, sycl::read_only};
 #else
     T *b_ptr = b;
     T *c_ptr = c;
@@ -184,9 +184,9 @@ void SYCLStream<T>::add()
   queue->submit([&](sycl::handler &cgh)
   {
 #if defined(ACCESSOR)
-    sycl::accessor a {d_a, cgh, sycl::read_only};
-    sycl::accessor b {d_b, cgh, sycl::read_only};
-    sycl::accessor c {d_c, cgh, sycl::write_only};
+  sycl::accessor a {*d_a, cgh, sycl::read_only};
+  sycl::accessor b {*d_b, cgh, sycl::read_only};
+  sycl::accessor c {*d_c, cgh, sycl::write_only};
 #else
     T *a_ptr = a;
     T *b_ptr = b;
@@ -216,9 +216,9 @@ void SYCLStream<T>::triad()
   queue->submit([&](sycl::handler &cgh)
   {
 #if defined(ACCESSOR)
-    sycl::accessor a {d_a, cgh, sycl::write_only};
-    sycl::accessor b {d_b, cgh, sycl::read_only};
-    sycl::accessor c {d_c, cgh, sycl::read_only};
+  sycl::accessor a {*d_a, cgh, sycl::write_only};
+  sycl::accessor b {*d_b, cgh, sycl::read_only};
+  sycl::accessor c {*d_c, cgh, sycl::read_only};
 #else
     T *a_ptr = a;
     T *b_ptr = b;
@@ -248,9 +248,9 @@ void SYCLStream<T>::nstream()
   queue->submit([&](sycl::handler &cgh)
   {
 #if defined(ACCESSOR)
-    sycl::accessor a {d_a, cgh};
-    sycl::accessor b {d_b, cgh, sycl::read_only};
-    sycl::accessor c {d_c, cgh, sycl::read_only};
+  sycl::accessor a {*d_a, cgh};
+  sycl::accessor b {*d_b, cgh, sycl::read_only};
+  sycl::accessor c {*d_c, cgh, sycl::read_only};
 #else
     T *a_ptr = a;
     T *b_ptr = b;
@@ -279,15 +279,15 @@ T SYCLStream<T>::dot()
 #if defined(ACCESSOR)
   queue->submit([&](sycl::handler &cgh)
   {
-    sycl::accessor a {d_a, cgh, sycl::read_only};
-    sycl::accessor b {d_b, cgh, sycl::read_only};
+    sycl::accessor a {*d_a, cgh, sycl::read_only};
+    sycl::accessor b {*d_b, cgh, sycl::read_only};
     cgh.parallel_for(sycl::range<1>{array_size},
       // Reduction object, to perform summation - initialises the result to zero
       // AdaptiveCpp doesn't sypport the initialize_to_identity property yet
 #if defined(__HIPSYCL__) || defined(__OPENSYCL__) || defined(__ADAPTIVECPP__)
-      sycl::reduction(d_sum, cgh, sycl::plus<T>()),
+  sycl::reduction(*d_sum, cgh, sycl::plus<T>()),
 #else
-      sycl::reduction(d_sum, cgh, sycl::plus<T>(), sycl::property::reduction::initialize_to_identity{}),
+  sycl::reduction(*d_sum, cgh, sycl::plus<T>(), sycl::property::reduction::initialize_to_identity{}),
 #endif
       [a = a, b = b](sycl::id<1> idx, auto &sum)
       {
@@ -295,7 +295,7 @@ T SYCLStream<T>::dot()
       });
   });
   queue->wait();
-  sycl::host_accessor h_sum {d_sum, sycl::read_only};
+  sycl::host_accessor h_sum {*d_sum, sycl::read_only};
   return h_sum[0];
 #else
   *sum = static_cast<T>(0);
@@ -335,9 +335,9 @@ void SYCLStream<T>::init_arrays(T initA, T initB, T initC)
   queue->submit([&](sycl::handler &cgh)
   {
 #if defined(ACCESSOR)
-    sycl::accessor a {d_a, cgh, sycl::write_only, sycl::no_init};
-    sycl::accessor b {d_b, cgh, sycl::write_only, sycl::no_init};
-    sycl::accessor c {d_c, cgh, sycl::write_only, sycl::no_init};
+  sycl::accessor a {*d_a, cgh, sycl::write_only, sycl::no_init};
+  sycl::accessor b {*d_b, cgh, sycl::write_only, sycl::no_init};
+  sycl::accessor c {*d_c, cgh, sycl::write_only, sycl::no_init};
 #else
     T *a_ptr = a;
     T *b_ptr = b;
@@ -370,9 +370,9 @@ template <class T>
 void SYCLStream<T>::get_arrays(T const*& h_a, T const*& h_b, T const*& h_c)
 {
 #if defined(ACCESSOR)
-  sycl::host_accessor a {d_a, sycl::read_only};
-  sycl::host_accessor b {d_b, sycl::read_only};
-  sycl::host_accessor c {d_c, sycl::read_only};
+  sycl::host_accessor a {*d_a, sycl::read_only};
+  sycl::host_accessor b {*d_b, sycl::read_only};
+  sycl::host_accessor c {*d_c, sycl::read_only};
   host_a.assign(a.begin(), a.end());
   host_b.assign(b.begin(), b.end());
   host_c.assign(c.begin(), c.end());

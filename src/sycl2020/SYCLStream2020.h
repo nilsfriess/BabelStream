@@ -38,7 +38,7 @@ class SYCLStream : public Stream<T>
 
     // Buffers
     T *a{}, *b{}, *c{}, *sum{};
-    sycl::buffer<T> d_a, d_b, d_c, d_sum;
+    std::unique_ptr<sycl::buffer<T>> d_a, d_b, d_c, d_sum;
     std::vector<T> host_a, host_b, host_c;
 
   public:
@@ -55,7 +55,7 @@ class SYCLStream : public Stream<T>
     T    dot() override;
 
     void get_arrays(T const*& a, T const*& b, T const*& c) override;    
-    void init_arrays(T initA, T initB, T initC);
+    void init_arrays(T initA, T initB, T initC) override;
 };
 
 // Populate the devices list
